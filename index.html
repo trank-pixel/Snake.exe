@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Змейка: The Void</title>
+    <style>
+        /* === ВЕСЬ CSS ВНУТРИ (РАБОТАЕТ БЕЗ ИНТЕРНЕТА) === */
+        :root {
+            --bg-color: #111;
+            --screen-bg: #000;
+            --text-color: #0f0;
+            --border-color: #333;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            margin: 5px 0;
+            text-shadow: 2px 2px #000;
+            text-align: center;
+        }
+
+        #gameContainer {
+            position: relative;
+            border: 10px solid #444;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        }
+
+        canvas {
+            display: block;
+            background-color: var(--screen-bg);
+            image-rendering: pixelated; /* Четкие пиксели */
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 5px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            background: rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+        }
+
+        /* Кнопки управления для мобилок */
+        #mobileControls {
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px;
+            gap: 5px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            background: #222;
+            border: 2px solid #0f0;
+            color: #0f0;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            touch-action: manipulation; /* Убирает задержку тапа */
+        }
+        .btn:active { background: #0f0; color: #000; }
+        
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 2; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+
+        /* Оверлеи (Экраны сообщений) */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 10;
+            padding: 20px;
+            border: 2px solid red;
+            display: none; /* Скрыто по умолчанию */
+        }
+
+        .overlay.visible { display: flex; }
+
+        .glitch-text {
+            font-size: 1.5rem;
+            color: red;
+            animation: shake 0.2s infinite;
+        }
+
+        .code-block {
+            background: #000033;
+            border: 1px solid #00f;
+            color: #00f;
+            padding: 10px;
+            font-size: 10px;
+            text-align: left;
+            margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+
+        button.restart-btn {
+            background: red;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            cursor: pointer;
+            font-family: inherit;
+            margin-top: 10px;
+        }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1 id="gameTitle">SNAKE.EXE</h1>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="300" height="300"></canvas>
+        
+        <div id="ui-layer">
+            <span id="scoreDisplay">SCORE: 0</span>
+            <span id="chaosDisplay">MODE: NORMAL</span>
+        </div>
+
+        <!-- Оверлей сообщений -->
+        <div id="overlay" class="overlay">
+            <div id="overlayContent">
+                <h2 class="glitch-text">CRITICAL_ERROR</h2>
+                <div class="code-block" id="consoleLog">
+                    System.out.print("Loading chaos...");
+                </div>
+                <button class="restart-btn" onclick="forceStart()">INIT_SYSTEM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Контролы -->
+    <div id="mobileControls">
+        <div class="btn btn-left" onclick="input(-1, 0)">←</div>
+        <div class="btn btn-down" onclick="input(0, 1)">↓</div>
+        <div class="btn btn-up" onclick="input(0, -1)">↑</div>
+        <div class="btn btn-right" onclick="input(1, 0)">→</div>
+    </div>
+
+    <script>
+        // === НАСТРОЙКИ ===
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('overlay');
+        const consoleLog = document.getElementById('consoleLog');
+        const chaosDisplay = document.getElementById('chaosDisplay');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const titleEl = document.getElementById('gameTitle');
+
+        let TILE = 15;
+        let W = canvas.width / TILE;
+        let H = canvas.height / TILE;
+        let FPS = 10;
+        let loopId;
+
+        // === СОСТОЯНИЕ ===
+        let snake = [{x: 10, y: 10}];
+        let dx = 0, dy = 0;
+        let food = null;
+        let bots = []; // Массив для всех ботов (умных, тупых, моронов)
+        let particles = []; // Для взрывов
+        let gameTime = 0;
+        let phase = 0; // 0:Start, 1:Trash, 2:Morons, 3:Idiot, 4:Heaven, 5:Amogus, 6:Space, 7:VOID
+        let score = 0;
+        let shakeAmount = 0;
+        let game_ending_triggered = false; // Флаг для предотвращения двойной смерти после встречи с Amogus
+
+        // === ИНИЦИАЛИЗАЦИЯ ===
+        function forceStart() {
+            overlay.classList.remove('visible');
+            resetGame();
+            // Начинаем с 10 FPS
+            loopId = setInterval(gameLoop, 1000 / FPS);
+        }
+
+        function resetGame() {
+            // Очистка таймера и сброс скорости
+            if (loopId) clearInterval(loopId);
+            FPS = 10; 
+            
+            snake = [{x: 10, y: 10}, {x:9, y:10}, {x:8, y:10}];
+            dx = 1; dy = 0;
+            score = 0;
+            gameTime = 0;
+            phase = 0;
+            bots = [];
+            particles = [];
+            game_ending_triggered = false; // Сброс флага
+            
+            // Создаем первого "умного" бота
+            bots.push(createBot('smart', '#f00'));
+            spawnFood();
+            chaosDisplay.innerText = "MODE: NORMAL";
+            titleEl.innerText = "SNAKE.EXE";
+            document.body.style.filter = "none"; // Убираем инверсию из VOID
+        }
+
+        // === ГЛАВНЫЙ ЦИКЛ ===
+        function gameLoop() {
+            // Если концовка уже запущена, просто выходим из цикла
+            if (game_ending_triggered) return;
+
+            gameTime++; // Считаем тики (1 тик = 100мс при 10 FPS)
+
+            // 1. ЛОГИКА ФАЗ (СЦЕНАРИЙ ХАОСА)
+            handlePhases();
+
+            // 2. ОБНОВЛЕНИЕ
+            updateSnake();
+            
+            // Если updateSnake запустил концовку, останавливаемся
+            if (game_ending_triggered) return;
+
+            updateBots();
+            updateParticles();
+
+            // 3. ОТРИСОВКА
+            draw();
+
+            // Эффект тряски
+            if (shakeAmount > 0) {
+                canvas.style.transform = `translate(${Math.random()*shakeAmount - shakeAmount/2}px, ${Math.random()*shakeAmount - shakeAmount/2}px)`;
+                shakeAmount *= 0.9;
+                if(shakeAmount < 1) {
+                    shakeAmount = 0;
+                    canvas.style.transform = 'none';
+                }
+            }
+        }
+
+        // === СЦЕНАРИЙ (АКТЫ) ===
+        function handlePhases() {
+            // АКТ 1: 10 сек (100 тиков) - Бот идет в помойку
+            if (phase === 0 && gameTime > 100) {
+                phase = 1;
+                chaosDisplay.innerText = "MODE: TRASH TIME";
+                bots[0].type = 'trash_seeker';
+            }
+
+            // АКТ 2: Бот удалился (проверяем в updateBots), спавним 3 моронов
+            // Это происходит автоматически, когда бот умирает в фазе 1.
+
+            // АКТ 3: Idiot Bot (Ускоряем: 250 тиков всего)
+            if (phase === 2 && gameTime > 250) { 
+                phase = 3;
+                bots = []; // Убиваем моронов
+                // Спавним бессмертного идиота
+                bots.push(createBot('idiot', '#0ff'));
+                chaosDisplay.innerText = "MODE: IDIOT BOT";
+            }
+
+            // АКТ 4: Food Heaven (Ускоряем: 350 тиков всего)
+            if (phase === 3 && gameTime > 350) {
+                phase = 4;
+                bots = []; // Убираем идиота
+                chaosDisplay.innerText = "MODE: FOOD HEAVEN";
+                // Заполняем поле едой
+                food = []; // Очищаем одиночную еду
+                for(let i=0; i<80; i++) spawnFood(true); // Много еды
+            }
+
+            // АКТ 5: Амогус (через 10 сек рая, 450 тиков всего)
+            if (phase === 4 && gameTime > 450) {
+                phase = 5;
+                food = null; // Убираем еду
+                chaosDisplay.innerText = "MODE: AMOGUS";
+                // Спавним Амогуса как бота
+                bots.push(createBot('amogus', '#f00'));
+            }
+        }
+
+        // === ОБНОВЛЕНИЕ ЗМЕЙКИ ===
+        function updateSnake() {
+            // В режиме ПУСТОТЫ змейка глючит
+            if (phase === 7 && Math.random() < 0.2) {
+                dx = [0,0,1,-1][Math.floor(Math.random()*4)];
+                dy = [0,0,1,-1][Math.floor(Math.random()*4)];
+            }
+
+            const head = {x: snake[0].x + dx, y: snake[0].y + dy};
+
+            // СТЕНЫ
+            if (phase !== 7) { // В пустоте нет стен
+                if (head.x < 0) head.x = W - 1;
+                if (head.x >= W) head.x = 0;
+                if (head.y < 0) head.y = H - 1;
+                if (head.y >= H) head.y = 0;
+            } else {
+                // В пустоте уход за границу удаляет сегменты
+                if (head.x < 0 || head.x >= W || head.y < 0 || head.y >= H) {
+                    snake.pop(); // Теряем хвост
+                    if(snake.length === 0) gameOver("DISSOLVED_IN_VOID");
+                    return;
+                }
+            }
+
+            // САМОЕДСТВО
+            if (snake.some(s => s.x === head.x && s.y === head.y)) {
+                gameOver("OUROBOROS_ERROR");
+                return;
+            }
+
+            snake.unshift(head);
+
+            // ЕДА
+            let ate = false;
+            
+            if (Array.isArray(food)) {
+                for (let i = 0; i < food.length; i++) {
+                    if (head.x === food[i].x && head.y === food[i].y) {
+                        score += 1;
+                        food.splice(i, 1);
+                        ate = true;
+                        spawnParticles(head.x, head.y, '#ff0');
+                        break;
+                    }
+                }
+            } 
+            else if (food && head.x === food.x && head.y === food.y) {
+                score += 1;
+                ate = true;
+                spawnParticles(head.x, head.y, '#ff0');
+                spawnFood();
+            }
+
+            if (!ate) snake.pop();
+            
+            // Проверка столкновения с ботами
+            bots.forEach(bot => {
+                if (bot.type === 'amogus') {
+                    // Амогус выкидывает в космос при касании (проксимити)
+                    if (Math.abs(bot.body[0].x - head.x) < 2 && Math.abs(bot.body[0].y - head.y) < 2) {
+                        triggerSpaceEnding();
+                        game_ending_triggered = true; // Устанавливаем флаг
+                    }
+                } else {
+                    // ВСЕ остальные боты убивают при столкновении
+                    bot.body.forEach(seg => {
+                        if (seg.x === head.x && seg.y === head.y) {
+                            gameOver("BOT_COLLISION");
+                            game_ending_triggered = true; // Устанавливаем флаг, чтобы остановить update
+                        }
+                    });
+                }
+            });
+
+            scoreDisplay.innerText = "SCORE: " + score;
+        }
+
+        // === ОБНОВЛЕНИЕ БОТОВ ===
+        function updateBots() {
+            bots.forEach((bot, index) => {
+                let target = (Array.isArray(food) && food.length > 0) ? food[0] : food;
+                if (!target && phase !== 1) target = snake[0]; 
+
+                // ЛОГИКА ДВИЖЕНИЯ
+                if (bot.type === 'trash_seeker') {
+                    target = {x: W-1, y: H-1}; 
+                    if (bot.body[0].x === target.x && bot.body[0].y === target.y) {
+                        // Бот удалился
+                        bots.splice(index, 1);
+                        // Запускаем фазу МОРОНОВ
+                        phase = 2;
+                        chaosDisplay.innerText = "MODE: 3 MORONS";
+                        bots.push(createBot('moron', '#55f'));
+                        bots.push(createBot('moron', '#55f'));
+                        bots.push(createBot('moron', '#55f'));
+                        return;
+                    }
+                } else if (bot.type === 'moron') {
+                    // Морон просто бежит и умирает об стены
+                    if (Math.random() < 0.2) bot.dir = randomDir();
+                } else if (bot.type === 'idiot') {
+                    // Идиот ходит случайно, но проходит сквозь стены
+                    if (Math.random() < 0.7) bot.dir = randomDir(); 
+                } else if (bot.type === 'amogus') {
+                    // Амогус преследует игрока
+                    target = snake[0];
+                }
+
+                // AI движения (простой)
+                if (bot.type !== 'moron' && bot.type !== 'idiot') {
+                    if (target) {
+                        if (bot.body[0].x < target.x) bot.dir = {x:1, y:0};
+                        else if (bot.body[0].x > target.x) bot.dir = {x:-1, y:0};
+                        else if (bot.body[0].y < target.y) bot.dir = {x:0, y:1};
+                        else if (bot.body[0].y > target.y) bot.dir = {x:0, y:-1};
+                    }
+                }
+
+                let nx = bot.body[0].x + bot.dir.x;
+                let ny = bot.body[0].y + bot.dir.y;
+
+                // Проверка стен для бота
+                if (bot.type === 'moron') {
+                    if (nx < 0 || nx >= W || ny < 0 || ny >= H) {
+                        // Морон сдох
+                        bots.splice(index, 1);
+                        spawnParticles(bot.body[0].x, bot.body[0].y, '#00f');
+                        return;
+                    }
+                } else {
+                    // Остальные проходят сквозь стены
+                    if (nx < 0) nx = W - 1;
+                    if (nx >= W) nx = 0;
+                    if (ny < 0) ny = H - 1;
+                    if (ny >= H) ny = 0;
+                }
+
+                bot.body.unshift({x: nx, y: ny});
+                
+                // Длина бота
+                let len = 5;
+                if (bot.type === 'amogus') len = 2; 
+                if (bot.body.length > len) bot.body.pop();
+            });
+        }
+
+        function createBot(type, color) {
+            return {
+                type: type,
+                color: color,
+                body: [{x: Math.floor(Math.random()*W), y: Math.floor(Math.random()*H)}],
+                dir: {x:1, y:0},
+                x: 0, y: 0 
+            };
+        }
+
+        // === ГРАФИКА (РИСУЕМ КОДОМ, БЕЗ КАРТИНОК) ===
+        function draw() {
+            // Очистка
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Рисуем еду
+            if (food) {
+                if (Array.isArray(food)) {
+                    ctx.fillStyle = '#ff0';
+                    food.forEach(f => ctx.fillRect(f.x*TILE, f.y*TILE, TILE-1, TILE-1));
+                } else {
+                    // Одиночная еда (Большус?)
+                    ctx.fillStyle = '#ff0';
+                    ctx.beginPath();
+                    ctx.arc(food.x*TILE + TILE/2, food.y*TILE + TILE/2, TILE/2, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+
+            // Рисуем ПОМОЙКУ (только в фазе 1)
+            if (phase === 1) {
+                drawIcon(W-2, H-2, 'trash');
+            }
+
+            // Рисуем Игрока
+            if (phase === 7) ctx.fillStyle = `hsl(${Math.random()*360}, 100%, 50%)`; // Глитч цвет
+            else ctx.fillStyle = '#0f0';
+            
+            snake.forEach(s => ctx.fillRect(s.x*TILE, s.y*TILE, TILE-1, TILE-1));
+
+            // Рисуем Ботов
+            bots.forEach(bot => {
+                if (bot.type === 'amogus') {
+                    drawIcon(bot.body[0].x, bot.body[0].y, 'amogus');
+                } else {
+                    ctx.fillStyle = bot.color;
+                    bot.body.forEach(b => ctx.fillRect(b.x*TILE, b.y*TILE, TILE-1, TILE-1));
+                }
+            });
+
+            // Частицы
+            particles.forEach(p => {
+                ctx.fillStyle = p.c;
+                ctx.fillRect(p.x, p.y, p.s, p.s);
+            });
+        }
+
+        // Рисование иконок кодом (Canvas API)
+        function drawIcon(gx, gy, type) {
+            const x = gx * TILE;
+            const y = gy * TILE;
+            
+            if (type === 'trash') {
+                // Рисуем ведро
+                ctx.fillStyle = '#888';
+                ctx.fillRect(x+2, y+4, 11, 10);
+                // Крышка
+                ctx.fillStyle = '#aaa';
+                ctx.fillRect(x+1, y+1, 13, 2);
+                // Полоски
+                ctx.fillStyle = '#000';
+                ctx.fillRect(x+4, y+6, 2, 6);
+                ctx.fillRect(x+9, y+6, 2, 6);
+            } else if (type === 'amogus') {
+                // Красное тело
+                ctx.fillStyle = '#f00';
+                ctx.fillRect(x+2, y+2, 10, 12);
+                // Рюкзак
+                ctx.fillRect(x, y+4, 2, 8);
+                // Ноги
+                ctx.fillRect(x+2, y+14, 3, 3);
+                ctx.fillRect(x+9, y+14, 3, 3);
+                // Визор
+                ctx.fillStyle = '#0ff';
+                ctx.fillRect(x+6, y+4, 6, 4);
+            }
+        }
+
+        // === ЧАСТИЦЫ ===
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function spawnParticles(gx, gy, color) {
+            for(let i=0; i<5; i++) {
+                particles.push({
+                    x: gx * TILE + TILE/2,
+                    y: gy * TILE + TILE/2,
+                    vx: (Math.random()-0.5)*4,
+                    vy: (Math.random()-0.5)*4,
+                    life: 10,
+                    c: color,
+                    s: Math.random()*3+1
+                });
+            }
+        }
+
+        // === КОНЦОВКИ ===
+        function triggerSpaceEnding() {
+            clearInterval(loopId);
+            game_ending_triggered = true; // Фиксируем конец игры
+            shakeAmount = 20;
+            draw(); // Последний кадр
+            
+            setTimeout(() => {
+                // Показываем оверлей с текстом
+                overlay.classList.add('visible');
+                const finalMsg = `
+print("Happy End");
+if 'snake' alive = goose
+
+> SYSTEM REBOOTING...
+> LOADING "THE VOID"...
+`;
+                consoleLog.innerText = finalMsg;
+                
+                // Меняем кнопку на "ENTER THE VOID"
+                const btn = document.querySelector('.restart-btn');
+                btn.innerText = "ENTER THE VOID";
+                btn.onclick = enterTheVoid;
+            }, 1000);
+        }
+
+        function enterTheVoid() {
+            // ЗАПУСК ПОСТ-ХЭППИ ЭНДА (БЕСКОНЕЧНЫЙ КОШМАР)
+            overlay.classList.remove('visible');
+            resetGame(); // Сбрасываем все, кроме фильтра
+            
+            phase = 7; // VOID MODE
+            chaosDisplay.innerText = "MODE: T H E   V O I D";
+            document.body.style.filter = "invert(100%)"; // Инверсия
+            
+            // Увеличиваем скорость для VOID
+            FPS = 30; 
+            loopId = setInterval(gameLoop, 1000 / FPS);
+        }
+
+        function gameOver(reason) {
+            clearInterval(loopId);
+            game_ending_triggered = true; // Фиксируем конец игры
+            shakeAmount = 10;
+            overlay.classList.add('visible');
+            consoleLog.innerText = `FATAL ERROR: ${reason}\n\nReboot required.`;
+            
+            if (reason === "BOT_COLLISION") {
+                consoleLog.innerText = `FATAL ERROR: BOT_COLLISION\n\n[INFO]: All non-passive entities in this chaos dimension are hostile. IDIOT BOT is hostile.\n\nReboot required.`;
+            }
+
+            const btn = document.querySelector('.restart-btn');
+            btn.innerText = "RESTART";
+            btn.onclick = forceStart;
+        }
+
+        // === УПРАВЛЕНИЕ ===
+        function spawnFood(multi = false) {
+            if (multi) {
+                if (!Array.isArray(food)) food = [];
+                food.push({x: Math.floor(Math.random()*W), y: Math.floor(Math.random()*H)});
+            } else {
+                food = {x: Math.floor(Math.random()*W), y: Math.floor(Math.random()*H)};
+            }
+        }
+
+        function input(x, y) {
+            if (dx === -x && dy === -y) return; // Нельзя развернуться
+            dx = x;
+            dy = y;
+        }
+
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowUp') input(0, -1);
+            if (e.key === 'ArrowDown') input(0, 1);
+            if (e.key === 'ArrowLeft') input(-1, 0);
+            if (e.key === 'ArrowRight') input(1, 0);
+        });
+
+        function randomDir() {
+            return [{x:1,y:0}, {x:-1,y:0}, {x:0,y:1}, {x:0,y:-1}][Math.floor(Math.random()*4)];
+        }
+
+        // АВТОСТАРТ
+        setTimeout(forceStart, 100);
+
+    </script>
+</body>
+</html>
+
